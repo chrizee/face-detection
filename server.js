@@ -4,7 +4,10 @@ const bcrypt = require("bcrypt-nodejs");
 //include cors to avoid cors error
 //const cors = require("cors");
 const knex = require('knex');
-
+const register = require('./controllers/register');
+const login = require('./controllers/login');
+const profile = require('./controllers/profile');
+const image = require('./controllers/image');
 
 const app = express();
 const database = knex({
@@ -25,61 +28,12 @@ app.get("/", (req,res) => {
     res.send(database.users);
 })
 
-app.post("/login", (req,res) => {
-    const { email, password } = req.body;
-    database.select('*').from("users")
-    .where('email', email)
-    .then(data => {
-        const isValid = bcrypt.compareSync(password, data[0].password);
-        if(isValid) {
-            res.json({success: true, user: data[0]});
-        } else{
-            res.status(400).json({success: false});
-        }
-    })
-    .catch(err => res.status(400).json({success: false}))
-})
+app.post("/login", (req,res) => {login.handleLogin(req,res, database, bcrypt)})
+app.post("/register", (req, res) => {register.handleRegister(req,res, database, bcrypt)});
+app.get("/profile/:id", (req, res) => {profile.handleProfile(req,res, database)});
+app.put("/image", image.handleImage(database));
 
-app.post("/register", (req,res) => {
-    const {email, name, password} = req.body;
-    database('users')
-    .returning("*") //for postgress, doesn't work with mysql
-    .insert({
-        email,name,password: bcrypt.hashSync(password)
-    })
-    .then(response => {
-        const user = {
-            name,email,entries: 0,created_at: new Date()
-        }
-        res.json({success: true, user})
-    })
-    .catch(err => res.status(400).json({success: false, message: "Failed to register"}))
-})
-
-app.get("/profile/:id", (req,res) => {
-    const {id} = req.params;
-    database.select("*").from('users').where('id', id)
-    .then(user => {
-        if(user.length > 0) {
-            res.json(user[0]);
-        }else {
-            res.status(400).json("Not found");
-        }
-    })
-    .catch(err => res.status(400).json('error getting  user'))
-})
-
-app.put("/image", (req, res) => {
-    const {id} = req.body;
-    database('users').where('id', id)
-    .increment('entries', 1)
-    .returning('entries')
-    .then(entries => {
-        console.log(entries);
-        res.json({success : true, entries});
-    })
-    .catch(err => res.status(400).json("not found"))
-})
+console.log(process.env.PORT);
 app.listen("3006", () => {
     console.log("server started on port 3006");
 });
